@@ -3,6 +3,7 @@ Organise lifetime intervals during which IceCube is operational and taking data
 """
 
 import numpy as np
+from scipy import stats
 import os
 from abc import ABC
 from astropy import units as u
@@ -22,17 +23,44 @@ class LifeTime(ABC):
         return self._data
 
 
-    def lifetime_from_mjd(self, mjd_min: float, mjd_max: float) -> dict[str|u.quantity.Quantity[u.yr]]:
+    def lifetime_from_mjd(
+            self,
+            mjd_min: float,
+            mjd_max: float,
+            squeeze: bool = True
+        ) -> dict[str|u.quantity.Quantity[u.yr]]:
         """Compute lifetime from provided min and max mjd.
 
         :param mjd_min: Minimum mjd
         :type mjd_min: float
         :param mjd_max: Maximum mjd
         :type mjd_max: float
+        :param squeeze: If true, remove keys with 0 duration
+        :type squeeze: bool
         :return: Dictionary with detector season: duration in astropy.units.yr
         :rtype: dict[str|u.quantity.Quantity[u.yr]]
         """
-        pass
+
+        if mjd_min < self._times[0, 0]:
+            logger.warning(f"{mjd_min} is outside of experiment.")
+
+        if mjd_max > self._times[-1, -1]:
+            logger.warning(f"{mjd_max} is outside of experiment.")
+
+        output = {}
+        for s in self._data.keys():
+            # Query histograms for fraction of total lifetime in a season
+            # multiply by total lifetime in a season to get appropriate value
+            time = (
+                self._dists[s].cdf(mjd_max) - self._dists[s].cdf(mjd_min)
+            ) * self._lifetimes[s]
+            # set atol to 1e-9 days, so we are below the time resolution of event mjd (1e-8 days)
+            if squeeze and np.isclose(time.to_value(u.d), 0., atol=1e-9):
+                time = 0 * u.yr
+            
+            output[s] = time
+
+        return output
 
     def lifetime_from_season(self, *seasons) -> dict[str|u.quantity.Quantity[u.yr]]:
         """Compute lifetime of given seasons
@@ -42,7 +70,11 @@ class LifeTime(ABC):
         :rtype: dict[str|u.quantity.Quantity[u.yr]]
         """
 
-        pass
+        output = {}
+        for s in seasons:
+            output[s] = self._lifetimes[s]
+
+        return output
 
 class DR2LifeTime(LifeTime):
 
@@ -69,6 +101,9 @@ class DR2LifeTime(LifeTime):
         # Array of start and end times
         self._times = np.zeros((4, 2))
         self._data = {}
+        self._dists = {}
+        self._lifetimes = {}
+        # Dict keeps this order of keys
         for c, s in enumerate([IC40, IC59, IC79, IC86]):
             if s != IC86:
                 self._data[s] = np.loadtxt(
@@ -90,11 +125,21 @@ class DR2LifeTime(LifeTime):
                                 directory,
                                 sub_directory,
                                 "uptime",
-                                f"{s+suffering}_exp.csv",
+                                f"{str(s)+suffering}_exp.csv",
                             )
                         )
                     )
                 self._data[s] = np.concatenate(data)
-            #self._times[c, 0] = self._data[s][0, 0]
-            #self._times[c, 1] = self._data[s][-1, -1]
-    pass
+            # Store start and end times of each season
+            self._times[c, 0] = self._data[s][0, 0]
+            self._times[c, 1] = self._data[s][-1, -1]
+            self._lifetimes[s] = (np.sum(np.diff(self._data[s])) << u.d).to(u.yr)
+            # Create histogram of on/off data
+            # bins are just increasing values of the flattened times
+            bins = np.sort(self._data[s].flatten())
+            on_off = np.zeros(bins.size - 1)
+            # Every other entry is a one, indicating running detector
+            on_off[::2] = 1.
+            # density=True for on_off to be treated as density
+            self._dists[s] = stats.rv_histogram((on_off, bins), density=True)
+    

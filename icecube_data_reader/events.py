@@ -196,7 +196,7 @@ class IceTrackDR2Events(Events):
         for s in seasons:
             if s == IC86:
                 for suffering in suffixes:
-                    _append_data(s+suffering)
+                    _append_data(str(s)+suffering)
             else:
                 _append_data(s)
 
@@ -209,14 +209,9 @@ class IceTrackDR2Events(Events):
         coord = SkyCoord(ra=ra, dec=dec, frame="icrs")
 
 
-        events = cls()
-
-        events._energy = energy
-        events._mjd = mjd
-        events._ang_err = ang_err
-        events._dec = dec
+        events = cls(energy, coord, type, ang_err, mjd)
         events._ra = ra
-        events._coord = coord
-        events._type = type
+        events._dec = dec
+
         
         return events
