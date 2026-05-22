@@ -6,13 +6,11 @@ import numpy as np
 from zipfile import ZipFile
 import tarfile
 from pathlib import Path
-from bs4 import BeautifulSoup
 from tqdm import tqdm
 import requests
 import requests_cache
 import time
 import os
-from os.path import join
 import logging
 
 logger = logging.getLogger(__name__)
@@ -34,14 +32,13 @@ available_datasets = {
     I3_14: {
         "url": "https://dataverse.harvard.edu/api/access/dataset/:persistentId/versions/1.0?persistentId=doi:10.7910/DVN/MMIIZA",
         "dir": "IceTracksDR2",
-        "subdir": "icecube_14year_ps"
-        },
+        "subdir": "icecube_14year_ps",
+    },
     I3_10: {
         "url": "https://dataverse.harvard.edu/api/access/dataset/:persistentId/?persistentId=doi:10.7910/DVN/VKL316",
         "dir": "20210126_PS-IC40-IC86_VII",
         "subdir": "icecube_10year_ps",
     },
-    
 }
 
 
@@ -65,7 +62,6 @@ class IceCubeData:
         :param cache_name: Name of the requests cache
         """
 
-
         self.data_directory = data_directory
 
         requests_cache.install_cache(
@@ -76,7 +72,6 @@ class IceCubeData:
         # Make data directory if it doesn't exist
         if not os.path.exists(self.data_directory):
             os.makedirs(self.data_directory)
-
 
     def fetch(self, *datasets, overwrite=False, write_to=None):
         """
@@ -94,9 +89,7 @@ class IceCubeData:
 
         for dataset in datasets:
             if dataset not in available_datasets:
-                raise ValueError(
-                    "Dataset %s is not in list of known datasets" % dataset
-                )
+                raise ValueError("Dataset %s is not in list of known datasets" % dataset)
 
             ds = available_datasets[dataset]
             url = ds["url"]
@@ -112,16 +105,18 @@ class IceCubeData:
                     response = requests.get(url, stream=True)
 
                     if response.ok:
-
                         # For progress bar description
                         short_name = dataset
                         if len(dataset) > 40:
                             short_name = dataset[0:40] + "..."
 
                         # Save locally
-                        with open(file, "wb") as f, tqdm(
-                            desc=short_name,
-                        ) as bar:
+                        with (
+                            open(file, "wb") as f,
+                            tqdm(
+                                desc=short_name,
+                            ) as bar,
+                        ):
                             for chunk in response.iter_content(chunk_size=1024 * 1024):
                                 size = f.write(chunk)
                                 bar.update(size)
@@ -156,7 +151,6 @@ class IceCubeData:
             self.data_directory = old_dir
 
 
-
 def find_files(directory: Path, keyword: str):
     """
     Find files in a directory that contain
@@ -178,6 +172,7 @@ def find_files(directory: Path, keyword: str):
 
     return found_files
 
+
 def find_folders(directory: Path, keyword: str):
     """
     Find subfolders in a directory that
@@ -198,6 +193,7 @@ def find_folders(directory: Path, keyword: str):
                     found_folders.append(os.path.join(root, d))
 
     return found_folders
+
 
 def crawl_delay():
     """

@@ -14,8 +14,8 @@ from astropy.time import Time
 
 import logging
 
-from .downloader import data_directory, I3_10, I3_14, available_datasets, IceCubeData
-from .event_types import IC40, IC59, IC79, IC86, IC86_I, IC86_II, suffixes
+from .downloader import data_directory, I3_14, available_datasets, IceCubeData
+from .event_types import IC40, IC59, IC79, IC86, suffixes
 from .lifetime import LifeTime
 
 logger = logging.getLogger(__name__)
@@ -30,35 +30,34 @@ class Events(ABC):
     @property
     def mjd(self):
         return self._mjd
-    
+
     @property
     def energy(self):
         return self._energy
-    
+
     @property
     def ang_err(self):
         return self._ang_err
-    
+
     @property
     def coord(self):
         return self._coord
-    
+
     @property
     def ra(self):
         return self._ra
-    
+
     @property
     def dec(self):
         return self._dec
-    
+
     @property
     def type(self):
         return self._type
-    
+
     @property
     def N(self):
         return self.type.size
-    
 
     def apply_energy_cut(self, Emin: u.GeV, Emax: u.GeV = np.inf * u.GeV):
         pass
@@ -82,7 +81,7 @@ class IceTrackDR2Events(Events):
         coord: SkyCoord,
         type: np.ndarray,
         ang_err: u.deg,
-        mjd: Time
+        mjd: Time,
     ):
         self._energy = energy
         self._coord = coord
@@ -111,12 +110,11 @@ class IceTrackDR2Events(Events):
     def scramble_mjd(self, lifetime: LifeTime, seed: int = 42) -> None:
         pass
 
-
     def select(self, mask: npt.NDArray[np.bool_]):
         """
         Select some subset of existing events by providing a mask.
         :param mask: Array of bools with same length as event properties.
-        
+
         :returns: None
         """
 
@@ -142,7 +140,7 @@ class IceTrackDR2Events(Events):
         If none are provided, use all.
 
         :param seasons: Seasons to load
-        
+
         :returns: Event container :py:class:`icecube_data_reader.events.Events`
         """
 
@@ -168,7 +166,6 @@ class IceTrackDR2Events(Events):
             data_interface = IceCubeData()
             dataset = data_interface.find(I3_14)
             data_interface.fetch(dataset)
-            dataset_dir = data_interface.get_path_to(dataset[0])
 
         energy = []
         ra = []
@@ -176,7 +173,6 @@ class IceTrackDR2Events(Events):
         mjd = []
         ang_err = []
         type = []
-
 
         def _append_data(s):
             data = np.loadtxt(
@@ -196,7 +192,7 @@ class IceTrackDR2Events(Events):
         for s in seasons:
             if s == IC86:
                 for suffering in suffixes:
-                    _append_data(s+suffering)
+                    _append_data(str(s) + suffering)
             else:
                 _append_data(s)
 
@@ -208,15 +204,8 @@ class IceTrackDR2Events(Events):
         type = np.concatenate(type)
         coord = SkyCoord(ra=ra, dec=dec, frame="icrs")
 
-
-        events = cls()
-
-        events._energy = energy
-        events._mjd = mjd
-        events._ang_err = ang_err
-        events._dec = dec
+        events = cls(energy, coord, type, ang_err, mjd)
         events._ra = ra
-        events._coord = coord
-        events._type = type
-        
+        events._dec = dec
+
         return events
