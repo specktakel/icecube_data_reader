@@ -18,11 +18,11 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        python -m pip install wheel flake8 pytest pytest-cov
-        python -m pip install .
+        python -m pip install 
+        python -m pip install '.[dev]'
     - name: Test with pytest
       run: |
-        pytest -vv --cov=icecube_data-reader/ --cov-report=xml tests
+        pytest -vv --cov=icecube_data_reader/ --cov-report=xml tests
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v6
       with:
