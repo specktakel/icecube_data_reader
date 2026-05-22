@@ -13,9 +13,10 @@ def test_total_lt():
         from_array = np.sum(np.diff(lt._data[s]))
         assert pytest.approx(total[s].to_value(u.d)) == from_array
 
+
 def test_lt_from_mjd():
-    mjd_min = 54562.3720308 - 1   # 1 day before IC40 start
-    mjd_max = 54563.04198119 + 0.002   # 0.002 days after 2nd interval ends,
+    mjd_min = 54562.3720308 - 1.0  # 1 day before IC40 start
+    mjd_max = 54563.04198119 + 0.002  # 0.002 days after 2nd interval ends,
     # i.e. inbetween to next operational time window
 
     obs_time = lt.lifetime_from_mjd(mjd_min, mjd_max)[IC40].to_value(u.d)
