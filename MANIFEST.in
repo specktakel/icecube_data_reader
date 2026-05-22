@@ -1,0 +1,2 @@
+include versioneer.py
+include icecube_data_reader/_version.py
