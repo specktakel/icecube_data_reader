@@ -7,8 +7,8 @@ from scipy import stats
 import os
 from abc import ABC
 from astropy import units as u
-from .downloader import data_directory, I3_14, available_datasets, IceCubeData
-from .event_types import IC40, IC59, IC79, IC86, suffixes, EventType
+from icecube_data_reader.downloader import data_directory, I3_14, available_datasets, IceCubeData
+from icecube_data_reader.event_types import IC40, IC59, IC79, IC86, suffixes, EventType
 
 import logging
 
@@ -88,8 +88,7 @@ class DR2LifeTime(LifeTime):
             )
         except FileNotFoundError:
             data_interface = IceCubeData()
-            dataset = data_interface.find(I3_14)
-            data_interface.fetch(dataset)
+            data_interface.fetch(I3_14)
 
         # Array of start and end times
         self._times = np.zeros((4, 2))
