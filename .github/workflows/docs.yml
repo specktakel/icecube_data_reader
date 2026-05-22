@@ -2,11 +2,11 @@ name: Docs
 on:
   push:
     branches:
-      - main
+      - master
       - docs
   pull_request:
     branches:
-      - main
+      - master
 
 concurrency:
   group: "pages"
@@ -51,7 +51,7 @@ jobs:
 
   deploy:
     name: Deploy docs
-    if: ${{ github.event_name == 'push' && github.ref_name == 'main' }}
+    if: ${{ github.event_name == 'push' && github.ref_name == 'master' }}
     needs: build
     environment:
       name: github-pages
