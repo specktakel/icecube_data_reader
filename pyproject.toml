@@ -21,6 +21,7 @@ dependencies = [
     "numpy",
     "astropy",
     "scipy",
+    "h5py",
     "tqdm",
     "requests",
     "requests_cache",
