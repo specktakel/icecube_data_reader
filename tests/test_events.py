@@ -3,6 +3,7 @@ from icecube_data_reader.event_types import IC40
 from astropy import units as u
 import numpy as np
 from pathlib import Path
+import os
 
 import pytest
 
@@ -16,6 +17,12 @@ def test_saving(output_directory):
     events = IceTrackDR2Events.from_event_files(IC40)
     path = events.to_file(Path(output_directory) / "ic40_events.h5")
     return (path, events)
+
+def test_overwriting(output_directory, test_saving):
+    path, events = test_saving
+    time_appended = events.to_file(path)
+    assert os.path.basename(time_appended) in os.listdir(output_directory)
+
 
 def test_loading(test_saving):
     path, ic40 = test_saving
@@ -36,3 +43,16 @@ def test_selecting(test_saving):
 
     assert pytest.approx(events.energy[0].to_value(u.GeV)) == e
     assert et == events.int_event_type[0]
+
+
+def test_erroneous_selecting(test_saving):
+    idx = 5
+    events = IceTrackDR2Events.from_event_files(IC40)
+    N = events.N
+    mask = np.zeros(N, dtype=bool)
+    mask[idx] = True
+
+    with pytest.raises(ValueError, match="Mask needs to be of the same length as N."):
+        mask = np.zeros(N+1, dtype=bool)
+        mask[1] = 1
+        events.select(mask)
