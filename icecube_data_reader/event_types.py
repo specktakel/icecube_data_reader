@@ -123,7 +123,7 @@ class Refrigerator:
         """Returns stan event-type corresponding to python event-type string"""
 
         for dm in cls.detectors:
-            if str_ == dm.S:
+            if str_ == str(dm):
                 return dm.S
         else:
             raise ValueError(f"No detector {str_} available.")
