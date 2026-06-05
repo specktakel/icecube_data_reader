@@ -14,12 +14,26 @@ from astropy.time import Time
 import h5py
 from time import time as thyme
 
-from icecube_data_reader.downloader import data_directory, I3_14, available_datasets, IceCubeData
-from icecube_data_reader.event_types import IC40, IC59, IC79, IC86, suffixes, EventType, Refrigerator
+from icecube_data_reader.downloader import (
+    data_directory,
+    I3_14,
+    available_datasets,
+    IceCubeData,
+)
+from icecube_data_reader.event_types import (
+    IC40,
+    IC59,
+    IC79,
+    IC86,
+    suffixes,
+    EventType,
+    Refrigerator,
+)
 from icecube_data_reader.lifetime import LifeTime
 
 from typing import Self
 import logging
+
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
@@ -34,16 +48,16 @@ class Events(ABC):
         return self._mjd
 
     @property
-    def energy(self):
-        return self._energy
+    def energies(self):
+        return self._energies
 
     @property
-    def ang_err(self):
-        return self._ang_err
+    def ang_errs(self):
+        return self._ang_errs
 
     @property
-    def coord(self):
-        return self._coord
+    def coords(self):
+        return self._coords
 
     @property
     def ra(self):
@@ -52,23 +66,22 @@ class Events(ABC):
     @property
     def dec(self):
         return self._dec
-    
-    @property
-    def unit_vector(self):
-        return self._unit_vector
 
     @property
-    def event_type(self):
-        return self._event_type
-    
-    @property
-    def int_event_type(self):
-        return self._int_event_type
+    def unit_vectors(self):
+        return self._unit_vectors
 
+    @property
+    def types(self):
+        return self._types
+
+    @property
+    def int_types(self):
+        return self._int_types
 
     @property
     def N(self):
-        return self.event_type.size
+        return self.types.size
 
     @u.quantity_input
     def apply_energy_cut(self, Emin: u.GeV, Emax: u.GeV = np.inf * u.GeV):
@@ -78,7 +91,7 @@ class Events(ABC):
         :type Emin: u.GeV
         :param Emax: Maximum energy, defaults to np.inf*u.GeV
         :type Emax: u.GeV, optional
-        """        
+        """
         pass
 
     @classmethod
@@ -90,6 +103,10 @@ class Events(ABC):
     def to_file():
         pass
 
+    @abstractmethod
+    def remove(self, i) -> None:
+        pass
+
 
 class IceTrackDR2Events(Events):
     """
@@ -97,29 +114,31 @@ class IceTrackDR2Events(Events):
     """
 
     mjd_ = 3
-    energy_ = 4
-    ang_err_ = 5
-    ra_ = 6
-    dec_ = 7
+    energies_ = 4
+    ang_errs_ = 5
+    ras_ = 6
+    decs_ = 7
 
     @u.quantity_input
     def __init__(
         self,
-        energy: u.GeV,
-        coord: SkyCoord,
-        event_type: np.ndarray,
-        ang_err: u.deg,
+        energies: u.GeV,
+        coords: SkyCoord,
+        types: np.ndarray,
+        ang_errs: u.deg,
         mjd: Time,
     ):
-        self._energy = energy
-        self._coord = coord
-        self._event_type = event_type
-        self._int_event_type = np.array([_.S for _ in event_type])
-        self._ang_err = ang_err
+        self._energies = energies
+        self._coords = coords
+        self._types = types
+        self._int_types = np.array([_.S for _ in types])
+        self._ang_errs = ang_errs
         self._mjd = mjd
-        self._coord.representation_type = "cartesian"
-        self._unit_vector = np.array([coord.x.value, coord.y.value, coord.z.value]).T
-        self._coord.representation_type = "spherical"
+        self._coords.representation_type = "cartesian"
+        self._unit_vectors = np.array(
+            [coords.x.value, coords.y.value, coords.z.value]
+        ).T
+        self._coords.representation_type = "spherical"
 
     def scramble_ra(self, seed: int = 42) -> None:
         """
@@ -139,7 +158,7 @@ class IceTrackDR2Events(Events):
     def scramble_mjd(self, lifetime: LifeTime, seed: int = 42) -> None:
         pass
 
-    def select(self, mask: npt.NDArray[np.bool_]):
+    def select(self, mask: npt.NDArray[np.bool_]) -> None:
         """
         Select some subset of existing events by providing a mask.
         :param mask: Array of bools with same length as event properties.
@@ -155,21 +174,34 @@ class IceTrackDR2Events(Events):
         except AttributeError:
             pass
 
-        self._energy = self._energy[mask]
-        self._coord = self._coord[mask]
-        self._unit_vector = self._unit_vector[mask]
-        self._event_type = self._event_type[mask]
-        self._int_event_type = self._int_event_type[mask]
-        self._ang_err = self._ang_err[mask]
+        self._energies = self._energies[mask]
+        self._coords = self._coords[mask]
+        self._unit_vectors = self._unit_vectors[mask]
+        self._types = self._types[mask]
+        self._int_types = self._int_types[mask]
+        self._ang_errs = self._ang_errs[mask]
         self._mjd = self._mjd[mask]
 
+    def remove(self, i: int) -> None:
+        """
+        Remove the event at index i
+        :param i: Event index
+        :type i: int
+        """
+        self._energies = np.delete(self._energies, i)
+        self._coords = np.delete(self._coords, i)
+        self._unit_vectors = np.delete(self._unit_vectors, i, axis=0)
+        self._types = np.delete(self._types, i)
+        self._ang_errs = np.delete(self._ang_errs, i)
+        self._mjd = np.delete(self._mjd, i)
+
     def to_file(
-            self,
-            path: Path,
-            append: bool = False,
-            group_name: str | None = None,
-            overwrite: bool = False
-        ) -> Path:
+        self,
+        path: Path,
+        append: bool = False,
+        group_name: str | None = None,
+        overwrite: bool = False,
+    ) -> Path:
         """Write events to file.
         Keyworded arguments control behaviour with existing files.
         If not overwrite, but `path` exists, append a timestamp to the file name.
@@ -187,12 +219,12 @@ class IceTrackDR2Events(Events):
         :rtype: Path
         """
 
-        self._file_keys = ["energy", "unit_vector", "event_type", "ang_err", "mjd"]
+        self._file_keys = ["energies", "unit_vectors", "types", "ang_errs", "mjd"]
         self._file_values = [
-            self.energy.to(u.GeV).value,
-            self.unit_vector,
-            self.int_event_type,
-            self.ang_err.to(u.deg).value,
+            self.energies.to(u.GeV).value,
+            self.unit_vectors,
+            self.int_types,
+            self.ang_errs.to(u.deg).value,
             self.mjd.mjd,
         ]
 
@@ -241,7 +273,7 @@ class IceTrackDR2Events(Events):
     def from_file(
         cls,
         filename: Path,
-        group_name:str = None,
+        group_name: str = None,
     ) -> Self:
         """Load events from .h5 file
 
@@ -249,42 +281,53 @@ class IceTrackDR2Events(Events):
         :type filename: Path
         :param group_name: Name of events group, if provided when writing to file, defaults to None
         :type group_name: str, optional
-        """        
+        """
         with h5py.File(filename, "r") as f:
             if group_name is None:
                 events_folder = f["events"]
             else:
                 events_folder = f[group_name]
 
-            energy = events_folder["energy"][()] * u.GeV
-            uv = events_folder["unit_vector"][()]
-            int_event_type = events_folder["event_type"][()]
-            event_type = np.array([Refrigerator.int2dm(_) for _ in int_event_type])
-            ang_err = events_folder["ang_err"][()] * u.deg
+            energies = events_folder["energies"][()] * u.GeV
+            uv = events_folder["unit_vectors"][()]
+            int_types = events_folder["types"][()]
+            types = np.array([Refrigerator.int2dm(_) for _ in int_types])
+            ang_errs = events_folder["ang_errs"][()] * u.deg
 
             # For backwards compatibility
             try:
                 mjd = events_folder["mjd"][()]
             except KeyError:
-                mjd = [99.0] * len(energy)
+                mjd = [99.0] * len(energies)
 
-        coord = SkyCoord(
+        coords = SkyCoord(
             uv.T[0], uv.T[1], uv.T[2], representation_type="cartesian", frame="icrs"
         )
         mjd = Time(mjd, format="mjd")
-        coord.representation_type = "spherical"
-        events = cls(energy, coord, event_type, ang_err, mjd)
+        coords.representation_type = "spherical"
+        events = cls(energies, coords, types, ang_errs, mjd)
 
         return events
 
+    @u.quantity_input
+    def apply_energy_cut(self, Emin: u.GeV, Emax=np.inf * u.GeV) -> None:
+        """Apply energy cuts to events
+
+        :param Emin: Minimum allowed energy
+        :type Emin: u.GeV
+        :param Emax: Maximum allowed energy, defaults to np.inf*u.GeV
+        :type Emax: u.GeV, optional
+        """
+        mask = (self.energies >= Emin) & (self.energies <= Emax)
+        self.select(mask)
+
     @classmethod
-    def from_event_files(cls, *seasons: EventType) -> Self:
+    def from_event_files(cls, *seasons: EventType | str) -> Self:
         """
         Load data of provided seasons.
         If none are provided, use all.
 
         :param seasons: Seasons to load
-
         :returns: Event container :py:class:`icecube_data_reader.events.Events`
         """
 
@@ -310,12 +353,12 @@ class IceTrackDR2Events(Events):
             data_interface = IceCubeData()
             data_interface.fetch(I3_14)
 
-        energy = []
-        ra = []
-        dec = []
+        energies = []
+        ras = []
+        decs = []
         mjd = []
-        ang_err = []
-        event_type = []
+        ang_errs = []
+        types = []
 
         def _append_data(s, suffering: str = ""):
             data = np.loadtxt(
@@ -325,30 +368,31 @@ class IceTrackDR2Events(Events):
                 )
             )
 
-            energy.append(data[:, cls.energy_])
+            energies.append(data[:, cls.energies_])
             mjd.append(data[:, cls.mjd_])
-            ra.append(data[:, cls.ra_])
-            dec.append(data[:, cls.dec_])
-            ang_err.append(data[:, cls.ang_err_])
-            event_type.append(len(data[:, cls.energy_]) * [s])
+            ras.append(data[:, cls.ras_])
+            decs.append(data[:, cls.decs_])
+            ang_errs.append(data[:, cls.ang_errs_])
+            types.append(len(data[:, cls.energies_]) * [s])
 
         for s in seasons:
+            s = Refrigerator.str2dm(s) if isinstance(s, str) else s
             if s == IC86:
                 for suffering in suffixes:
                     _append_data(s, suffering)
             else:
                 _append_data(s)
 
-        energy = np.power(10, np.concatenate(energy)) << u.GeV
+        energies = np.power(10, np.concatenate(energies)) << u.GeV
         mjd = Time(np.concatenate(mjd), format="mjd")
-        ra = np.concatenate(ra) << u.deg
-        dec = np.concatenate(dec) << u.deg
-        ang_err = np.concatenate(ang_err) << u.deg
-        event_type = np.concatenate(event_type)
-        coord = SkyCoord(ra=ra, dec=dec, frame="icrs")
+        ras = np.concatenate(ras) << u.deg
+        decs = np.concatenate(decs) << u.deg
+        ang_errs = np.concatenate(ang_errs) << u.deg
+        types = np.concatenate(types)
+        coords = SkyCoord(ra=ras, dec=decs, frame="icrs")
 
-        events = cls(energy, coord, event_type, ang_err, mjd)
-        events._ra = ra
-        events._dec = dec
+        events = cls(energies, coords, types, ang_errs, mjd)
+        events._ras = ras
+        events._decs = decs
 
         return events
